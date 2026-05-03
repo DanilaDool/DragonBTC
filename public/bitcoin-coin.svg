@@ -1,0 +1,43 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="coinGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F7931A;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#FFA726;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F57C00;stop-opacity:1" />
+    </linearGradient>
+    <radialGradient id="coinShine" cx="30%" cy="30%">
+      <stop offset="0%" style="stop-color:#FFF;stop-opacity:0.4" />
+      <stop offset="100%" style="stop-color:#FFF;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+  
+  <!-- Outer coin circle -->
+  <circle cx="16" cy="16" r="15" fill="url(#coinGradient)" stroke="#E65100" stroke-width="1"/>
+  
+  <!-- Inner circle -->
+  <circle cx="16" cy="16" r="12" fill="none" stroke="#FFA726" stroke-width="0.5" opacity="0.6"/>
+  
+  <!-- Bitcoin B symbol -->
+  <path d="M12 8 L12 24 M12 8 L16.5 8 C17.5 8 18.5 8.5 18.5 10 C18.5 11.5 17.5 12 16.5 12 L12 12 M12 12 L17 12 C18 12 19 12.5 19 14 C19 15.5 18 16 17 16 L12 16 M12 16 L12 24" 
+        stroke="#FFF" 
+        stroke-width="1.8" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" 
+        fill="none"/>
+  
+  <!-- Top and bottom lines of B -->
+  <line x1="10" y1="8" x2="14" y2="8" stroke="#FFF" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="10" y1="24" x2="14" y2="24" stroke="#FFF" stroke-width="1.5" stroke-linecap="round"/>
+  
+  <!-- Vertical lines through B -->
+  <line x1="13" y1="6" x2="13" y2="9" stroke="#FFF" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="13" y1="23" x2="13" y2="26" stroke="#FFF" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="11" y1="6" x2="11" y2="9" stroke="#FFF" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="11" y1="23" x2="11" y2="26" stroke="#FFF" stroke-width="1.2" stroke-linecap="round"/>
+  
+  <!-- Shine effect -->
+  <ellipse cx="12" cy="10" rx="6" ry="4" fill="url(#coinShine)" opacity="0.5"/>
+  
+  <!-- Edge highlight -->
+  <path d="M 16 1 A 15 15 0 0 1 31 16" stroke="#FFB74D" stroke-width="1" fill="none" opacity="0.6"/>
+</svg>

@@ -1,0 +1,24 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Dragon head silhouette with Bitcoin symbol -->
+  <defs>
+    <linearGradient id="dragonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F97316;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#A855F7;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3B82F6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Dragon silhouette -->
+  <path d="M16 2C16 2 12 4 10 8C8 12 8 16 10 18C12 20 14 20 16 18C18 16 20 14 22 14C24 14 26 16 26 18C26 20 24 22 22 22C20 22 18 20 18 18" 
+        stroke="url(#dragonGradient)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  
+  <!-- Dragon eye -->
+  <circle cx="12" cy="10" r="1.5" fill="url(#dragonGradient)"/>
+  
+  <!-- Bitcoin B symbol integrated -->
+  <path d="M14 20 L14 26 M14 20 L18 20 C19.5 20 20 21 20 22 C20 23 19.5 24 18 24 L14 24 M14 24 L18.5 24 C20 24 20.5 25 20.5 26 C20.5 27 20 28 18.5 28 L14 28 L14 26" 
+        stroke="url(#dragonGradient)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  
+  <!-- Horns -->
+  <path d="M8 6 L10 4 M14 4 L16 2" stroke="url(#dragonGradient)" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

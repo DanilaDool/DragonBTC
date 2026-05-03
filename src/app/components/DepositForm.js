@@ -18,92 +18,115 @@ import { UserContext } from "../UserContext";
 export default function DepositForm() {
   const { userData } = useContext(UserContext);
   const [satoshis, setSatoshis] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleInputChange = (event) => {
     setSatoshis(event.target.value);
+    setError("");
   };
 
   const buildTransaction = async (e) => {
     e.preventDefault();
-    // Helper for working with various API and RPC endpoints and getting and processing data
-    // Change this depending on what network you are working with
-    // const testnet = new TestnetHelper();
-    const testnet = new DevEnvHelper();
+    
+    // Валидация
+    setError("");
+    
+    if (!satoshis || parseInt(satoshis) <= 0) {
+      setError("Введите корректную сумму");
+      return;
+    }
+    
+    if (parseInt(satoshis) < 10000) {
+      setError("Минимальная сумма: 10000 сатоши (0.0001 BTC)");
+      return;
+    }
+    
+    // Проверка подключения кошелька
+    if (!userData?.profile?.stxAddress?.testnet) {
+      setError("Пожалуйста, подключите кошелек");
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      const testnet = new DevEnvHelper();
+      const bitcoinAccountA = await testnet.getBitcoinAccount(WALLET_00);
+      const btcAddress = bitcoinAccountA.wpkh.address;
+      const btcPublicKey = bitcoinAccountA.publicKey.buffer.toString();
 
-    // setting BTC address for devnet
-    // Because of some quirks with Leather, we need to pull our BTC wallet using the helper if we are on devnet
-    const bitcoinAccountA = await testnet.getBitcoinAccount(WALLET_00);
-    const btcAddress = bitcoinAccountA.wpkh.address;
-    const btcPublicKey = bitcoinAccountA.publicKey.buffer.toString();
+      let utxos = await testnet.fetchUtxos(btcAddress);
+      const pegAccount = await testnet.getBitcoinAccount(WALLET_00);
+      const pegAddress = pegAccount.tr.address;
 
-    // setting BTC address for testnet
-    // here we are pulling directly from our authenticated wallet
-    // const btcAddress = userData.profile.btcAddress.p2wpkh.testnet;
-    // const btcPublicKey = userData.profile.btcPublicKey.p2wpkh;
+      const tx = await sbtcDepositHelper({
+        pegAddress,
+        stacksAddress: userData.profile.stxAddress.testnet,
+        amountSats: satoshis,
+        feeRate: await testnet.estimateFeeRate("low"),
+        utxos,
+        bitcoinChangeAddress: btcAddress,
+      });
 
-    let utxos = await testnet.fetchUtxos(btcAddress);
+      const psbt = tx.toPSBT();
+      const requestParams = {
+        publicKey: btcPublicKey,
+        hex: bytesToHex(psbt),
+      };
+      const txResponse = await window.btc.request("signPsbt", requestParams);
+      const formattedTx = btc.Transaction.fromPSBT(
+        hexToBytes(txResponse.result.hex)
+      );
+      formattedTx.finalize();
+      const finalTx = await testnet.broadcastTx(formattedTx);
 
-    // If we are working via testnet
-    // get sBTC deposit address from bridge API
-    // const response = await fetch(
-    //   "https://bridge.sbtc.tech/bridge-api/testnet/v1/sbtc/init-ui"
-    // );
-    // const data = await response.json();
-    // const pegAddress = data.sbtcContractData.sbtcWalletAddress;
-
-    // if we are working via devnet we can use the helper to get the peg address, which is associated with the first wallet
-    const pegAccount = await testnet.getBitcoinAccount(WALLET_00);
-    const pegAddress = pegAccount.tr.address;
-
-    const tx = await sbtcDepositHelper({
-      // comment this line out if working via devnet
-      // network: TESTNET,
-      pegAddress,
-      stacksAddress: userData.profile.stxAddress.testnet,
-      amountSats: satoshis,
-      // we can use the helper to get an estimated fee for our transaction
-      feeRate: await testnet.estimateFeeRate("low"),
-      // the helper will automatically parse through these and use one or some as inputs
-      utxos,
-      // where we want our remainder to be sent. UTXOs can only be spent as is, not divided, so we need a new input with the difference between our UTXO and how much we want to send
-      bitcoinChangeAddress: btcAddress,
-    });
-
-    // convert the returned ttransaction object into a PSBT for Leather to use
-    const psbt = tx.toPSBT();
-    const requestParams = {
-      publicKey: btcPublicKey,
-      hex: bytesToHex(psbt),
-    };
-    // Call Leather API to sign the PSBT and finalize it
-    const txResponse = await window.btc.request("signPsbt", requestParams);
-    const formattedTx = btc.Transaction.fromPSBT(
-      hexToBytes(txResponse.result.hex)
-    );
-    formattedTx.finalize();
-
-    // Broadcast it using the helper
-    const finalTx = await testnet.broadcastTx(formattedTx);
-
-    // Get the transaction ID
-    console.log(finalTx);
+      console.log(finalTx);
+      alert("Транзакция отправлена: " + finalTx);
+      setSatoshis("");
+    } catch (error) {
+      console.error(error);
+      setError("Ошибка: " + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <form className="flex items-center justify-center space-x-4">
-      <input
-        type="number"
-        placeholder="Amount of BTC to deposit"
-        className="w-1/3 px-4 py-2 text-gray-300 bg-gray-700 rounded focus:outline-none focus:border-orange-500"
-        value={satoshis}
-        onChange={handleInputChange}
-      />
+    <form className="space-y-6">
+      <div>
+        <label className="block mb-3 text-sm font-light text-gray-500">
+          Сумма BTC (в сатоши)
+        </label>
+        <input
+          type="number"
+          placeholder="100000"
+          className="w-full px-4 py-3 text-white transition-all duration-200 bg-transparent border border-white/20 rounded-lg focus:outline-none focus:border-white/40"
+          value={satoshis}
+          onChange={handleInputChange}
+          disabled={loading}
+        />
+        {error && (
+          <p className="mt-2 text-sm text-red-400">{error}</p>
+        )}
+      </div>
+
+      <div className="p-4 border border-white/10 rounded-lg bg-white/5">
+        <div className="flex justify-between text-sm">
+          <span className="font-light text-gray-500">Получите sBTC</span>
+          <span className="text-white">
+            {satoshis ? (parseInt(satoshis) / 100000000).toFixed(8) : "0.00000000"} sBTC
+          </span>
+        </div>
+      </div>
+      
       <button
         type="submit"
-        className="px-6 py-2 bg-orange-500 rounded hover:bg-orange-600 focus:outline-none"
+        className="w-full px-6 py-3 text-sm font-medium text-black transition-all duration-200 bg-white rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
         onClick={buildTransaction}
+        disabled={loading}
       >
-        Deposit BTC
+        {loading ? "Обработка..." : "Конвертировать"}
       </button>
     </form>
   );

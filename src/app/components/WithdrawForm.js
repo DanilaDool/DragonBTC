@@ -20,118 +20,152 @@ export default function WithdrawForm() {
   const { userData, userSession } = useContext(UserContext);
   const [satoshis, setSatoshis] = useState("");
   const [signature, setSignature] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleInputChange = (event) => {
     setSatoshis(event.target.value);
+    setError("");
   };
 
   const signMessage = async (e) => {
     e.preventDefault();
+    
+    // Валидация
+    setError("");
+    
+    if (!satoshis || parseInt(satoshis) <= 0) {
+      setError("Введите корректную сумму");
+      return;
+    }
+    
+    if (parseInt(satoshis) < 10000) {
+      setError("Минимальная сумма: 10000 сатоши (0.0001 BTC)");
+      return;
+    }
+    
+    setLoading(true);
 
-    // const testnet = new TestnetHelper();
-    const testnet = new DevEnvHelper();
+    try {
+      const testnet = new DevEnvHelper();
+      const bitcoinAccountA = await testnet.getBitcoinAccount(WALLET_00);
+      const btcAddress = bitcoinAccountA.wpkh.address;
 
-    // First we need to sign a Stacks message to prove we own the sBTC
-    // The sbtc package can help us format this
-    const bitcoinAccountA = await testnet.getBitcoinAccount(WALLET_00);
-    const btcAddress = bitcoinAccountA.wpkh.address;
-
-    // setting BTC address for testnet
-    // here we are pulling directly from our authenticated wallet
-    // const btcAddress = userData.profile.btcAddress.p2wpkh.testnet;
-
-    const message = sbtcWithdrawMessage({
-      // network: TESTNET,
-      amountSats: satoshis,
-      bitcoinAddress: btcAddress,
-    });
-    // Now we can use Leather to sign that message
-    openSignatureRequestPopup({
-      message,
-      userSession,
-      network: new StacksMocknet(),
-      onFinish: (data) => {
-        // Here we set the signature
-        setSignature(data.signature);
-      },
-    });
+      const message = sbtcWithdrawMessage({
+        amountSats: satoshis,
+        bitcoinAddress: btcAddress,
+      });
+      
+      openSignatureRequestPopup({
+        message,
+        userSession,
+        network: new StacksMocknet(),
+        onFinish: (data) => {
+          setSignature(data.signature);
+          setLoading(false);
+        },
+        onCancel: () => {
+          setLoading(false);
+        },
+      });
+    } catch (error) {
+      console.error(error);
+      setError("Ошибка подписи: " + error.message);
+      setLoading(false);
+    }
   };
 
   const buildTransaction = async (e) => {
-    // Once the signature has been set, we can build and broadcast the transaction
     e.preventDefault();
-    // Helper for working with various API and RPC endpoints and getting and processing data
-    // Change this depending on what network you are working with
-    // const testnet = new TestnetHelper();
-    const testnet = new DevEnvHelper();
+    setLoading(true);
 
-    // setting BTC address for devnet
-    // Because of some quirks with Leather, we need to pull our BTC wallet using the helper if we are on devnet
-    const bitcoinAccountA = await testnet.getBitcoinAccount(WALLET_00);
-    const btcAddress = bitcoinAccountA.wpkh.address;
-    const btcPublicKey = bitcoinAccountA.publicKey.buffer.toString();
+    try {
+      const testnet = new DevEnvHelper();
+      const bitcoinAccountA = await testnet.getBitcoinAccount(WALLET_00);
+      const btcAddress = bitcoinAccountA.wpkh.address;
+      const btcPublicKey = bitcoinAccountA.publicKey.buffer.toString();
 
-    // setting BTC address for testnet
-    // here we are pulling directly from our authenticated wallet
-    // const btcAddress = userData.profile.btcAddress.p2wpkh.testnet;
-    // const btcPublicKey = userData.profile.btcPublicKey.p2wpkh;
+      let utxos = await testnet.fetchUtxos(btcAddress);
+      const pegAccount = await testnet.getBitcoinAccount(WALLET_00);
+      const pegAddress = pegAccount.tr.address;
 
-    let utxos = await testnet.fetchUtxos(btcAddress);
-
-    // If we are working via testnet
-    // get sBTC deposit address from bridge API
-    // const response = await fetch(
-    //   "https://bridge.sbtc.tech/bridge-api/testnet/v1/sbtc/init-ui"
-    // );
-    // const data = await response.json();
-    // const pegAddress = data.sbtcContractData.sbtcWalletAddress;
-
-    // if we are working via devnet we can use the helper to get the peg address, which is associated with the first wallet
-    const pegAccount = await testnet.getBitcoinAccount(WALLET_00);
-    const pegAddress = pegAccount.tr.address;
-
-    const tx = await sbtcWithdrawHelper({
-      // comment this line out if working via devnet
-      // network: TESTNET,
-      pegAddress,
-      bitcoinAddress: btcAddress,
-      amountSats: satoshis,
-      signature,
-      feeRate: await testnet.estimateFeeRate("low"),
-      fulfillmentFeeSats: 2000,
-      utxos,
-      bitcoinChangeAddress: btcAddress,
-    });
-    const psbt = tx.toPSBT();
-    const requestParams = {
-      publicKey: btcPublicKey,
-      hex: bytesToHex(psbt),
-    };
-    const txResponse = await window.btc.request("signPsbt", requestParams);
-    const formattedTx = btc.Transaction.fromPSBT(
-      hexToBytes(txResponse.result.hex)
-    );
-    formattedTx.finalize();
-    const finalTx = await testnet.broadcastTx(formattedTx);
-    console.log(finalTx);
+      const tx = await sbtcWithdrawHelper({
+        pegAddress,
+        bitcoinAddress: btcAddress,
+        amountSats: satoshis,
+        signature,
+        feeRate: await testnet.estimateFeeRate("low"),
+        fulfillmentFeeSats: 2000,
+        utxos,
+        bitcoinChangeAddress: btcAddress,
+      });
+      
+      const psbt = tx.toPSBT();
+      const requestParams = {
+        publicKey: btcPublicKey,
+        hex: bytesToHex(psbt),
+      };
+      const txResponse = await window.btc.request("signPsbt", requestParams);
+      const formattedTx = btc.Transaction.fromPSBT(
+        hexToBytes(txResponse.result.hex)
+      );
+      formattedTx.finalize();
+      const finalTx = await testnet.broadcastTx(formattedTx);
+      
+      console.log(finalTx);
+      alert("Транзакция отправлена: " + finalTx);
+      setSignature("");
+      setSatoshis("");
+    } catch (error) {
+      console.error(error);
+      setError("Ошибка: " + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <form className="flex items-center justify-center space-x-4">
-      <input
-        type="number"
-        placeholder="Amount of BTC to deposit"
-        className="w-1/3 px-4 py-2 text-gray-300 bg-gray-700 rounded focus:outline-none focus:border-orange-500"
-        value={satoshis}
-        onChange={handleInputChange}
-      />
+    <form className="space-y-6">
+      <div>
+        <label className="block mb-3 text-sm font-light text-gray-500">
+          Сумма sBTC (в сатоши)
+        </label>
+        <input
+          type="number"
+          placeholder="100000"
+          className="w-full px-4 py-3 text-white transition-all duration-200 bg-transparent border border-white/20 rounded-lg focus:outline-none focus:border-white/40"
+          value={satoshis}
+          onChange={handleInputChange}
+          disabled={loading}
+        />
+        {error && (
+          <p className="mt-2 text-sm text-red-400">{error}</p>
+        )}
+      </div>
+
+      <div className="p-4 border border-white/10 rounded-lg bg-white/5">
+        <div className="flex justify-between text-sm">
+          <span className="font-light text-gray-500">Получите BTC</span>
+          <span className="text-white">
+            {satoshis ? (parseInt(satoshis) / 100000000).toFixed(8) : "0.00000000"} BTC
+          </span>
+        </div>
+      </div>
+
+      {signature && (
+        <div className="p-4 text-sm text-center border border-white/20 rounded-lg bg-white/5 text-gray-400">
+          Подписано. Готово к отправке
+        </div>
+      )}
+      
       <button
-        className="px-6 py-2 bg-orange-500 rounded hover:bg-orange-600 focus:outline-none"
+        className="w-full px-6 py-3 text-sm font-medium text-black transition-all duration-200 bg-white rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
         onClick={(e) => {
           signature ? buildTransaction(e) : signMessage(e);
         }}
+        disabled={loading}
       >
-        {signature ? "Broadcast Withdraw Tx" : "Sign Withdraw Tx"}
+        {loading ? "Обработка..." : signature ? "Отправить" : "Подписать"}
       </button>
     </form>
   );

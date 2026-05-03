@@ -6,57 +6,97 @@ import { openContractCall } from "@stacks/connect";
 import { StacksMocknet, StacksTestnet } from "@stacks/network";
 
 export default function LendForm() {
-  const [amount, setAmount] = useState(0);
+  const [amount, setAmount] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleDeposit = async () => {
-    const functionArgs = [
-      uintCV(amount), // Convert the amount to uintCV
-    ];
+    // Валидация
+    setError("");
+    
+    if (!amount || parseFloat(amount) <= 0) {
+      setError("Введите корректную сумму");
+      return;
+    }
+    
+    if (parseFloat(amount) < 0.001) {
+      setError("Минимальная сумма: 0.001 sBTC");
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      const functionArgs = [
+        uintCV(Math.floor(parseFloat(amount) * 100000000)), // Convert to satoshis
+      ];
 
-    const contractAddress = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM"; // Replace with your contract address
-    const contractName = "lagoon"; // Replace with your contract name
-    const functionName = "deposit"; // Function for deposit
+      const contractAddress = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM";
+      const contractName = "lagoon";
+      const functionName = "deposit";
 
-    const options = {
-      contractAddress,
-      contractName,
-      functionName,
-      functionArgs,
-      network: new StacksMocknet(),
-      // network: new StacksMocknet(),
-      postConditionMode: PostConditionMode.Allow,
-      appDetails: {
-        name: "Lagoon",
-        icon: "https://freesvg.org/img/bitcoin.png", // You can provide an icon URL for your application
-      },
-      onFinish: (data) => {
-        console.log(data);
-      },
-    };
+      const options = {
+        contractAddress,
+        contractName,
+        functionName,
+        functionArgs,
+        network: new StacksMocknet(),
+        postConditionMode: PostConditionMode.Allow,
+        appDetails: {
+          name: "Lagoon",
+          icon: "https://freesvg.org/img/bitcoin.png",
+        },
+        onFinish: (data) => {
+          console.log(data);
+          alert("Транзакция отправлена успешно!");
+          setAmount("");
+          setLoading(false);
+        },
+        onCancel: () => {
+          setLoading(false);
+        },
+      };
 
-    await openContractCall(options);
+      await openContractCall(options);
+    } catch (error) {
+      console.error(error);
+      setError("Ошибка: " + error.message);
+      setLoading(false);
+    }
   };
 
   return (
     <form
-      className="flex items-center justify-center space-x-4"
+      className="space-y-6"
       onSubmit={(e) => {
         e.preventDefault();
         handleDeposit();
       }}
     >
-      <input
-        type="number"
-        placeholder="Amount to lend"
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        className="w-1/3 px-4 py-2 text-gray-300 bg-gray-700 rounded focus:outline-none focus:border-orange-500"
-      />
+      <div>
+        <label className="block mb-3 text-sm font-light text-gray-500">
+          Сумма sBTC
+        </label>
+        <input
+          type="number"
+          step="0.00000001"
+          placeholder="0.00"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className="w-full px-4 py-3 text-white transition-all duration-200 bg-transparent border border-white/20 rounded-lg focus:outline-none focus:border-white/40"
+          disabled={loading}
+        />
+        {error && (
+          <p className="mt-2 text-sm text-red-400">{error}</p>
+        )}
+      </div>
+      
       <button
         type="submit"
-        className="px-6 py-2 bg-orange-500 rounded hover:bg-orange-600 focus:outline-none"
+        className="w-full px-6 py-3 text-sm font-medium text-black transition-all duration-200 bg-white rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={loading}
       >
-        Lend sBTC
+        {loading ? "Обработка..." : "Внести в пул"}
       </button>
     </form>
   );
